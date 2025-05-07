@@ -1,0 +1,5 @@
+datasets
+jiwer
+transformers
+numpy
+scipy

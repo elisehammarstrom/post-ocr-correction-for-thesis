@@ -1,0 +1,13 @@
+LICENSE
+README.md
+pyproject.toml
+src/post_ocr/arguments.py
+src/post_ocr/data.py
+src/post_ocr/diff.py
+src/post_ocr/training.py
+src/post_ocr/utils.py
+src/post_ocr.egg-info/PKG-INFO
+src/post_ocr.egg-info/SOURCES.txt
+src/post_ocr.egg-info/dependency_links.txt
+src/post_ocr.egg-info/requires.txt
+src/post_ocr.egg-info/top_level.txt
