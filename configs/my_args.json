@@ -29,7 +29,7 @@
   "dataloader_num_workers": 8,
   "remove_unused_columns": true,
   "load_best_model_at_end": true,
-  "fsdp": [],
+  "fsdp": "full_shard",
   "optim": "adamw_torch",
   "group_by_length": true,
   "dataloader_pin_memory": true,

@@ -1,9 +1,10 @@
 import logging
 import os
 from functools import partial
-
+from typing import Dict, List
 
 import numpy as np
+
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
@@ -35,7 +36,7 @@ def optuna_hp_space(trial):
     }
 
 
-def compute_objective(metrics: dict[str, float]) -> list[float]:
+def compute_objective(metrics: Dict[str, float]) -> List[float]:
     return [metrics["eval_wer"], metrics["eval_cer"]]
 
 

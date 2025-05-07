@@ -213,6 +213,9 @@ Requires-Dist: jiwer
 Requires-Dist: transformers
 Requires-Dist: numpy
 Requires-Dist: scipy
+Requires-Dist: torch
+Requires-Dist: tqdm
+Requires-Dist: accelerate
 
 # Post OCR Correction
 

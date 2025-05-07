@@ -8,19 +8,39 @@ from post_ocr.arguments import get_args
 from post_ocr.training import run_training
 
 
-from datasets import concatenate_datasets
+from datasets import concatenate_datasets, Dataset
+
+def load_data_from_json(json_file_path):
+    """Load data from a JSON file into a datasets.Dataset object."""
+    with open(json_file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Convert to format expected by datasets.Dataset
+    dataset_dict = {
+        'file': [item['file'] for item in data],
+        'gt': [item['gt'] for item in data],
+        'ocr': [item['ocr'] for item in data]
+    }
+    
+    return Dataset.from_dict(dataset_dict)
 
 
-def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
-
+def prepare_data(gt=None, ocr=None, args=None, test_fns=None, val_fns=None, json_file_path=None):
+    seed = 666
     split_size = 0.15
 
-    kh_root = "data/kubhist/kubhist/"
-    ds = load_data(
-        f"{kh_root}/gt/{gt}/",
-        f"{kh_root}/ocr/{ocr}/",
-        cache_dir=args.cache_dir,
-    )
+    # Add this condition to handle JSON input
+    if json_file_path is not None:
+        ds = load_data_from_json(json_file_path)
+    else:
+        # Original code for loading from directories
+        kh_root = "data/kubhist/kubhist/"
+        ds = load_data(
+            f"{kh_root}/gt/{gt}/",
+            f"{kh_root}/ocr/{ocr}/",
+            cache_dir=args.cache_dir,
+        )
+
     if test_fns is None and val_fns is None:
         train_val_test = ds.train_test_split(test_size=split_size, seed=seed)
         test = train_val_test["test"]
@@ -118,77 +138,93 @@ if __name__ == "__main__":
 
     training_args, args = get_args()
 
-    test_fns = json.load(open("data/kubhist/og_holdout_files.json"))
+    # Path to your JSON file
+    json_file_path = "data/thesis_ocr_output/prepared_data.json"
 
-    abbyy = prepare_data("no-long-s", "Abbyy", args, test_fns=test_fns)
-    # test_fns = [x.split("/")[-1] for x in abbyy[2]["file"]]
-    val_fns = [x.split("/")[-1] for x in abbyy[1]["file"]]
-
-    abbyy_tesseract = prepare_data("no-long-s", "Abbyy-Tesseract", args, test_fns, val_fns)
-    tesseract = prepare_data("long-s", "Tesseract", args, test_fns, val_fns)
-
-    train_dataset = concatenate_datasets([abbyy[0], abbyy_tesseract[0], tesseract[0]])
-    val_dataset = concatenate_datasets([abbyy[1], abbyy_tesseract[1], tesseract[1]])
-    test_dataset = concatenate_datasets([abbyy[2], abbyy_tesseract[2], tesseract[2]])
-
-    _train_dataset = concatenate_datasets([abbyy[3], abbyy_tesseract[3], tesseract[3]])
-    _val_dataset = concatenate_datasets([abbyy[4], abbyy_tesseract[4], tesseract[4]])
-    _test_dataset = concatenate_datasets([abbyy[5], abbyy_tesseract[5], tesseract[5]])
-
-
-    print(
-        "eval score",
-        jiwer.cer(val_dataset["gt"], val_dataset["ocr"]),
-        jiwer.wer(val_dataset["gt"], val_dataset["ocr"]),
+    # Changed this line to use the JSON file path
+    train_dataset, val_dataset, test_dataset, _, _, _ = prepare_data(
+        args=args,
+        json_file_path=json_file_path
     )
-    print(
-        "eval score aligned",
-        jiwer.cer(_val_dataset["gt"], _val_dataset["ocr"]),
-        jiwer.wer(_val_dataset["gt"], _val_dataset["ocr"]),
-    )
-    print(
-        "test score",
-        jiwer.cer(test_dataset["gt"], test_dataset["ocr"]),
-        jiwer.wer(test_dataset["gt"], test_dataset["ocr"]),
-    )
-    print(
-        "test score aligned",
-        jiwer.cer(_test_dataset["gt"], _test_dataset["ocr"]),
-        jiwer.wer(_test_dataset["gt"], _test_dataset["ocr"]),
-    )
-    # print(model_args)
-    # print(data_args)
-    # print(training_args)
-    #
-    # print(model_args)
-    # print(model_args.model_name_or_path)
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #    model_args.model_name_or_path, cache_dir=model_args.cache_dir
-    # )
 
-    # import time
 
-    # print("encode")
-    # start = time.time()
-    # ocr_test_tok = tokenizer(test_chunks_filtered["ocr"])
-    # print(f"encoding took {time.time() - start:.4f}s")
+#     train_dataset, val_dataset, test_dataset, _, _, _ = prepare_data(
+#     gt="gt",
+#     ocr="ocr",
+#     args=args,
+#     test_fns=test_fns,
 
-    ## print("decode")
-    ## start = time.time()
-    ## ocr_test_detok = batch_decode(ocr_test_tok["input_ids"], tokenizer)
-    ## print(f"decoding took {time.time() - start:.4f}s")
+# )
 
-    # from transformers.trainer_utils import EvalPrediction
+    # abbyy = prepare_data("no-long-s", "Abbyy", args, test_fns=test_fns)
+    # # test_fns = [x.split("/")[-1] for x in abbyy[2]["file"]]
+    # val_fns = [x.split("/")[-1] for x in abbyy[1]["file"]]
 
-    # print(tokenizer.pad_token_id)
+    # abbyy_tesseract = prepare_data("no-long-s", "Abbyy-Tesseract", args, test_fns, val_fns)
+    # tesseract = prepare_data("long-s", "Tesseract", args, test_fns, val_fns)
+
+    # train_dataset = concatenate_datasets([abbyy[0], abbyy_tesseract[0], tesseract[0]])
+    # val_dataset = concatenate_datasets([abbyy[1], abbyy_tesseract[1], tesseract[1]])
+    # test_dataset = concatenate_datasets([abbyy[2], abbyy_tesseract[2], tesseract[2]])
+
+    # _train_dataset = concatenate_datasets([abbyy[3], abbyy_tesseract[3], tesseract[3]])
+    # _val_dataset = concatenate_datasets([abbyy[4], abbyy_tesseract[4], tesseract[4]])
+    # _test_dataset = concatenate_datasets([abbyy[5], abbyy_tesseract[5], tesseract[5]])
+
+
     # print(
-    #    compute_metrics(
-    #        EvalPrediction(
-    #            tokenizer(test_chunks_filtered["ocr"])["input_ids"],
-    #            tokenizer(test_chunks_filtered["gt"])["input_ids"],
-    #        ),
-    #        tokenizer,
-    #    )
+    #     "eval score",
+    #     jiwer.cer(val_dataset["gt"], val_dataset["ocr"]),
+    #     jiwer.wer(val_dataset["gt"], val_dataset["ocr"]),
     # )
+    # print(
+    #     "eval score aligned",
+    #     jiwer.cer(_val_dataset["gt"], _val_dataset["ocr"]),
+    #     jiwer.wer(_val_dataset["gt"], _val_dataset["ocr"]),
+    # )
+    # print(
+    #     "test score",
+    #     jiwer.cer(test_dataset["gt"], test_dataset["ocr"]),
+    #     jiwer.wer(test_dataset["gt"], test_dataset["ocr"]),
+    # )
+    # print(
+    #     "test score aligned",
+    #     jiwer.cer(_test_dataset["gt"], _test_dataset["ocr"]),
+    #     jiwer.wer(_test_dataset["gt"], _test_dataset["ocr"]),
+    # )
+    # # print(model_args)
+    # # print(data_args)
+    # # print(training_args)
+    # #
+    # # print(model_args)
+    # # print(model_args.model_name_or_path)
+    # # tokenizer = AutoTokenizer.from_pretrained(
+    # #    model_args.model_name_or_path, cache_dir=model_args.cache_dir
+    # # )
+
+    # # import time
+
+    # # print("encode")
+    # # start = time.time()
+    # # ocr_test_tok = tokenizer(test_chunks_filtered["ocr"])
+    # # print(f"encoding took {time.time() - start:.4f}s")
+
+    # ## print("decode")
+    # ## start = time.time()
+    # ## ocr_test_detok = batch_decode(ocr_test_tok["input_ids"], tokenizer)
+    # ## print(f"decoding took {time.time() - start:.4f}s")
+
+    # # from transformers.trainer_utils import EvalPrediction
+
+    # # print(tokenizer.pad_token_id)
+    # # print(
+    # #    compute_metrics(
+    # #        EvalPrediction(
+    # #            tokenizer(test_chunks_filtered["ocr"])["input_ids"],
+    # #            tokenizer(test_chunks_filtered["gt"])["input_ids"],
+    # #        ),
+    # #        tokenizer,
+    # #    )
+    # # )
 
     run_training(train_dataset, val_dataset, test_dataset)

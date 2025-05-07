@@ -3,3 +3,6 @@ jiwer
 transformers
 numpy
 scipy
+torch
+tqdm
+accelerate

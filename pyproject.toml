@@ -5,7 +5,10 @@ dependencies = [
     "jiwer",
     "transformers",
     "numpy",
-    "scipy"
+    "scipy",
+    "torch",
+    "tqdm",
+    "accelerate"
 ]
 
 
