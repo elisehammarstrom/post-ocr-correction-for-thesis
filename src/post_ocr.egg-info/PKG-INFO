@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: post_ocr
 Version: 0.0.1
 Summary: Post-OCR Correction
@@ -216,6 +216,7 @@ Requires-Dist: scipy
 Requires-Dist: torch
 Requires-Dist: tqdm
 Requires-Dist: accelerate
+Dynamic: license-file
 
 # Post OCR Correction
 

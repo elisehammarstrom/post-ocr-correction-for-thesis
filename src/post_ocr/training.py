@@ -45,7 +45,8 @@ def run_training(train_dataset, eval_dataset, test_dataset):
 
     logger = setup_logger(args)
 
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
+    #model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
+    model = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path, from_tf=True) # changed to load from tensorflow weights
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     # Data collator
@@ -119,7 +120,7 @@ def run_training(train_dataset, eval_dataset, test_dataset):
         if args.hypertune:
 
             def model_init(trial):
-                return AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
+                return AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path, from_tf=True)
 
             # Initialize our Trainer
             trainer = Seq2SeqTrainer(
