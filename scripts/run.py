@@ -1,26 +1,48 @@
 from functools import partial
-
 import jiwer
 import json
 
-from post_ocr.data import chunkify, filter_bad_sample, load_data, segment
+from post_ocr.data import chunkify, filter_bad_sample, segment
 from post_ocr.arguments import get_args
 from post_ocr.training import run_training
+from datasets import Dataset, DatasetDict, concatenate_datasets
 
+import os
+import warnings
 
-from datasets import concatenate_datasets
+import tensorflow as tf
 
+# Configure TensorFlow to see the GPU
+physical_devices = tf.config.list_physical_devices('GPU')
+if physical_devices:
+    try:
+        # Configure memory growth to avoid allocating all GPU memory at once
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
+        print(f"GPU detected and configured: {physical_devices}")
+    except Exception as e:
+        print(f"Error configuring GPU: {e}")
 
-def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+warnings.filterwarnings('ignore', category=UserWarning)
 
+def prepare_data_from_json(json_path, args, test_fns=None, val_fns=None, seed=666):
+    """Load data from a JSON file instead of kubhist dataset"""
+    
+    # Load the JSON data
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    # Convert to dataset
+    ds = Dataset.from_dict({
+        "file": [item["file"] for item in data],
+        "gt": [item["gt"] for item in data],
+        "ocr": [item["ocr"] for item in data]
+    })
+    
     split_size = 0.15
-
-    kh_root = "data/kubhist/kubhist/"
-    ds = load_data(
-        f"{kh_root}/gt/{gt}/",
-        f"{kh_root}/ocr/{ocr}/",
-        cache_dir=args.cache_dir,
-    )
+    
+    # Handle dataset splitting with same logic as original
     if test_fns is None and val_fns is None:
         train_val_test = ds.train_test_split(test_size=split_size, seed=seed)
         test = train_val_test["test"]
@@ -41,16 +63,18 @@ def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
             ).train_test_split(test_size=split_size, seed=seed)
             train = train_val["train"]
             val = train_val["test"]
-
-        print("Original data setup with one file per item")
-        print(train)
-        print(val)
-        print(test)
-
+    
+    print("Original data setup with one file per item")
+    print(train)
+    print(val)
+    print(test)
+    
+    # Apply the same processing steps as the original
     my_filter_bad_sample = partial(filter_bad_sample, min_len=4, max_cer=0.5)
-
+    
+    # Create aligned versions with same processing as original
     my_segment = partial(segment, align=True, max_length=128, max_cer=0.8)
-
+    
     test_chunks_aligned = (
         test.map(my_segment, batched=False, num_proc=4)
         .filter(my_filter_bad_sample)
@@ -66,32 +90,37 @@ def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
         .filter(my_filter_bad_sample)
         .map(chunkify, batched=True, num_proc=4)
     )
-
+    
     print("Segmented and aligned and chunked")
     print(train_chunks_aligned)
     print(val_chunks_aligned)
     print(test_chunks_aligned)
-
-    # print("test score")
-    # print(jiwer.cer(test_chunks_aligned["gt"], test_chunks_aligned["ocr"]))
-
+    
+    # Create filtered versions (non-aligned) with same processing as original
     my_segment = partial(segment, align=False, max_length=128, max_cer=0.8)
-
+    
     test_chunks_filtered = (
-        test.map(my_segment).filter(my_filter_bad_sample).map(chunkify, batched=True, num_proc=4)
+        test.map(my_segment, batched=False, num_proc=4)
+        .filter(my_filter_bad_sample)
+        .map(chunkify, batched=True, num_proc=4)
     )
     val_chunks_filtered = (
-        val.map(my_segment).filter(my_filter_bad_sample).map(chunkify, batched=True, num_proc=4)
+        val.map(my_segment, batched=False, num_proc=4)
+        .filter(my_filter_bad_sample)
+        .map(chunkify, batched=True, num_proc=4)
     )
     train_chunks_filtered = (
-        train.map(my_segment).filter(my_filter_bad_sample).map(chunkify, batched=True, num_proc=4)
+        train.map(my_segment, batched=False, num_proc=4)
+        .filter(my_filter_bad_sample)
+        .map(chunkify, batched=True, num_proc=4)
     )
-
+    
     print("Segmented and not aligned but filtered and chunked")
     print(train_chunks_filtered)
     print(val_chunks_filtered)
     print(test_chunks_filtered)
-
+    
+    # Calculate and print error metrics for filtered datasets
     print(
         "eval score",
         jiwer.cer(val_chunks_filtered["gt"], val_chunks_filtered["ocr"]),
@@ -102,7 +131,7 @@ def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
         jiwer.cer(test_chunks_filtered["gt"], test_chunks_filtered["ocr"]),
         jiwer.wer(test_chunks_filtered["gt"], test_chunks_filtered["ocr"]),
     )
-
+    
     return (
         train_chunks_filtered,
         val_chunks_filtered,
@@ -112,30 +141,39 @@ def prepare_data(gt, ocr, args, test_fns=None, val_fns=None):
         test_chunks_aligned,
     )
 
-
 if __name__ == "__main__":
     seed = 666
-
+    
     training_args, args = get_args()
+    
+    # Load test file names if available (similar to original)
+    # try:
+    #     test_fns = json.load(open("data/thesis_ocr_output/holdout_files.json"))
+    # except FileNotFoundError:
+    #     test_fns = None
+    #     val_fns = None
 
-    test_fns = json.load(open("data/kubhist/og_holdout_files.json"))
-
-    abbyy = prepare_data("no-long-s", "Abbyy", args, test_fns=test_fns)
-    # test_fns = [x.split("/")[-1] for x in abbyy[2]["file"]]
-    val_fns = [x.split("/")[-1] for x in abbyy[1]["file"]]
-
-    abbyy_tesseract = prepare_data("no-long-s", "Abbyy-Tesseract", args, test_fns, val_fns)
-    tesseract = prepare_data("long-s", "Tesseract", args, test_fns, val_fns)
-
-    train_dataset = concatenate_datasets([abbyy[0], abbyy_tesseract[0], tesseract[0]])
-    val_dataset = concatenate_datasets([abbyy[1], abbyy_tesseract[1], tesseract[1]])
-    test_dataset = concatenate_datasets([abbyy[2], abbyy_tesseract[2], tesseract[2]])
-
-    _train_dataset = concatenate_datasets([abbyy[3], abbyy_tesseract[3], tesseract[3]])
-    _val_dataset = concatenate_datasets([abbyy[4], abbyy_tesseract[4], tesseract[4]])
-    _test_dataset = concatenate_datasets([abbyy[5], abbyy_tesseract[5], tesseract[5]])
-
-
+    test_fns = None
+    val_fns = None
+    
+    # Prepare data from your JSON file
+    main_dataset = prepare_data_from_json(
+        "data/thesis_ocr_output/prepared_data.json", 
+        args, 
+        test_fns=test_fns
+    )
+    
+    # If you have multiple OCR outputs, you could load them separately and concatenate
+    # Otherwise, just use the main dataset for all parts to maintain structure
+    train_dataset = main_dataset[0]
+    val_dataset = main_dataset[1]
+    test_dataset = main_dataset[2]
+    
+    _train_dataset = main_dataset[3]
+    _val_dataset = main_dataset[4]
+    _test_dataset = main_dataset[5]
+    
+    # Print metrics like the original
     print(
         "eval score",
         jiwer.cer(val_dataset["gt"], val_dataset["ocr"]),
@@ -156,39 +194,6 @@ if __name__ == "__main__":
         jiwer.cer(_test_dataset["gt"], _test_dataset["ocr"]),
         jiwer.wer(_test_dataset["gt"], _test_dataset["ocr"]),
     )
-    # print(model_args)
-    # print(data_args)
-    # print(training_args)
-    #
-    # print(model_args)
-    # print(model_args.model_name_or_path)
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #    model_args.model_name_or_path, cache_dir=model_args.cache_dir
-    # )
-
-    # import time
-
-    # print("encode")
-    # start = time.time()
-    # ocr_test_tok = tokenizer(test_chunks_filtered["ocr"])
-    # print(f"encoding took {time.time() - start:.4f}s")
-
-    ## print("decode")
-    ## start = time.time()
-    ## ocr_test_detok = batch_decode(ocr_test_tok["input_ids"], tokenizer)
-    ## print(f"decoding took {time.time() - start:.4f}s")
-
-    # from transformers.trainer_utils import EvalPrediction
-
-    # print(tokenizer.pad_token_id)
-    # print(
-    #    compute_metrics(
-    #        EvalPrediction(
-    #            tokenizer(test_chunks_filtered["ocr"])["input_ids"],
-    #            tokenizer(test_chunks_filtered["gt"])["input_ids"],
-    #        ),
-    #        tokenizer,
-    #    )
-    # )
-
-    run_training(train_dataset, val_dataset, test_dataset)
+    
+    # Run the training with the prepared datasets
+    #run_training(train_dataset, val_dataset, test_dataset)
