@@ -208,14 +208,6 @@ Project-URL: Source, https://github.com/kb-labb/post-ocr-correction/
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: datasets
-Requires-Dist: jiwer
-Requires-Dist: transformers
-Requires-Dist: numpy
-Requires-Dist: scipy
-Requires-Dist: torch
-Requires-Dist: tqdm
-Requires-Dist: accelerate
 Dynamic: license-file
 
 # Post OCR Correction

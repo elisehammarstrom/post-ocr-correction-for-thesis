@@ -9,5 +9,4 @@ src/post_ocr/utils.py
 src/post_ocr.egg-info/PKG-INFO
 src/post_ocr.egg-info/SOURCES.txt
 src/post_ocr.egg-info/dependency_links.txt
-src/post_ocr.egg-info/requires.txt
 src/post_ocr.egg-info/top_level.txt

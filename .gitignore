@@ -1,5 +1,1 @@
-data/thesis_ocr_output
-cache_dir/
-extracted_data.json
-new_venv/
-venv/
+/data/thesis_ocr_output/

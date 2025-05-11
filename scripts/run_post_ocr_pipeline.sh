@@ -1,11 +1,11 @@
-echo "------- Running post-OCR pipeline -------"
+#!/bin/bash
 
-# Load arguments from JSON
-ARGS=$(jq -r 'to_entries | map("--" + .key + " " + (.value|tostring)) | join(" ")' configs/my_args.json)
+echo "------- Running post-OCR pipeline -------"
 
 echo "Preparing data for post-OCR pipeline..."
 # Run the Python script with the loaded arguments
 python scripts/prepare_json_for_post_ocr.py
 
 echo "Running post-OCR"
-python scripts/run.py $ARGS
+# Explicitly specify the model path and point to the config file
+python scripts/run.py --model_name_or_path google/byt5-small --config_name configs/my_args.json
